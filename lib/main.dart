@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'model/stored_data.dart' as model;
+import 'model/stopwatchextention.dart';
 import 'views/custombuttons.dart';
 import 'views/drawcircleview.dart';
 import 'views/laptimesview.dart';
@@ -33,11 +35,27 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   static final int TIME_TO_UPDATE = 10;
-  Stopwatch watch = new Stopwatch();
+  StopWatchExtended watch = new StopWatchExtended();
   Timer? timer;
 
   Duration totalInLaps = Duration(seconds: 0);
   List<Duration> lapTimes = [];
+
+  _MyHomePageState() {
+    getStartState();
+  }
+
+  void getStartState() async {
+    lapTimes = await model.getLaps();
+    totalInLaps = await model.getTotalTimeInLaps();
+    Duration? timeAppClosed = await model.getTimeAppClosed();
+    if (timeAppClosed != null) {
+      watch.setStartMicroseconds(timeAppClosed.inMicroseconds);
+      _startStopButtonPressed();
+    } else {
+      watch.setStartMicroseconds(totalInLaps.inMicroseconds);
+    }
+  }
 
   Widget bottomButton(String text, VoidCallback? onPressed) {
     return Expanded(
@@ -65,10 +83,10 @@ class _MyHomePageState extends State<MyHomePage> {
                 children: <Widget>[
                   CircleView(
                       color: Colors.yellow,
-                      angle:
-                          ((watch.elapsedMicroseconds % 60000000) / 60000000) *
-                              2 *
-                              math.pi),
+                      angle: ((watch.elapsedMicrosecondsExtended % 60000000) /
+                              60000000) *
+                          2 *
+                          math.pi),
                   Center(
                     child: Text(
                       formatTime(),
@@ -118,37 +136,37 @@ class _MyHomePageState extends State<MyHomePage> {
   // MARK: Buttons Clicked
 
   void _resetButtonPressed() {
-    setState(() {
-      watch.reset();
-      totalInLaps = Duration(seconds: 0);
-      lapTimes = [];
-    });
+    watch.resetExtended();
+    totalInLaps = Duration(seconds: 0);
+    lapTimes = [];
+
+    updateData();
+    setState(() {});
   }
 
   void _startStopButtonPressed() {
     if (timer == null) {
-      setState(() {
-        timer =
-            Timer.periodic(Duration(milliseconds: TIME_TO_UPDATE), _updateTime);
-        watch.start();
-      });
+      timer =
+          Timer.periodic(Duration(milliseconds: TIME_TO_UPDATE), _updateTime);
+      watch.start();
     } else {
-      setState(() {
-        timer!.cancel();
-        watch.stop();
-        timer = null;
-      });
+      timer!.cancel();
+      watch.stop();
+      timer = null;
     }
+    updateData();
+
+    setState(() {});
   }
 
   void _lapButtonPressed() {
-    Duration elapsed = watch.elapsed;
+    Duration elapsed = watch.elapsedExtended;
     Duration duration = elapsed - totalInLaps;
     totalInLaps = elapsed;
+    lapTimes.add(duration);
+    updateData();
 
-    setState(() {
-      lapTimes.add(duration);
-    });
+    setState(() {});
   }
 
   // MARK: Private functions
@@ -158,7 +176,17 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   String formatTime() {
-    Duration duration = watch.elapsed;
+    Duration duration = watch.elapsedExtended;
     return "${duration.inHours}:${duration.inMinutes.remainder(60)}:${(duration.inSeconds.remainder(60))}:${(duration.inMilliseconds.remainder(1000)) ~/ 10}";
+  }
+
+  void updateData() {
+    model.storeLaps(lapTimes);
+    model.storeTotalTimeInLaps(totalInLaps);
+    if (timer == null) {
+      model.storeTimeAppClosed(null);
+    } else {
+      model.storeTimeAppClosed(DateTime.now());
+    }
   }
 }
