@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'views/custombuttons.dart';
 import 'views/drawcircleview.dart';
+import 'views/laptimesview.dart';
 import 'dart:math' as math;
 import 'dart:async';
 
@@ -34,6 +35,21 @@ class _MyHomePageState extends State<MyHomePage> {
   static final int TIME_TO_UPDATE = 10;
   Stopwatch watch = new Stopwatch();
   Timer? timer;
+
+  Duration totalInLaps = Duration(seconds: 0);
+  List<Duration> lapTimes = [];
+
+  Widget bottomButton(String text, VoidCallback? onPressed) {
+    return Expanded(
+      child: Padding(
+        padding: EdgeInsets.all(16.0),
+        child: SecondaryButton(
+          text: text,
+          onPressed: onPressed,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,34 +86,26 @@ class _MyHomePageState extends State<MyHomePage> {
             ),
           ),
           Container(
+            constraints: BoxConstraints.expand(height: 100.0),
+            child: LapViews(
+              durations: lapTimes,
+            ),
+          ),
+          Container(
             constraints: BoxConstraints(
               minHeight: 100.0,
               maxHeight: 100.0,
-              maxWidth: 500,
+              maxWidth: 800,
             ),
             child: Center(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: SecondaryButton(
-                        text: 'Reset',
-                        onPressed: _resetButtonPressed,
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: SecondaryButton(
-                        text: timer == null ? 'Start' : 'Stop',
-                        onPressed: _startStopButtonPressed,
-                      ),
-                    ),
-                  ),
+                  bottomButton('Reset', _resetButtonPressed),
+                  bottomButton(timer == null ? 'Start' : 'Stop',
+                      _startStopButtonPressed),
+                  bottomButton('Lap', _lapButtonPressed),
                 ],
               ),
             ),
@@ -112,19 +120,35 @@ class _MyHomePageState extends State<MyHomePage> {
   void _resetButtonPressed() {
     setState(() {
       watch.reset();
+      totalInLaps = Duration(seconds: 0);
+      lapTimes = [];
     });
   }
 
   void _startStopButtonPressed() {
     if (timer == null) {
-      timer =
-          Timer.periodic(Duration(milliseconds: TIME_TO_UPDATE), _updateTime);
-      watch.start();
+      setState(() {
+        timer =
+            Timer.periodic(Duration(milliseconds: TIME_TO_UPDATE), _updateTime);
+        watch.start();
+      });
     } else {
-      timer!.cancel();
-      watch.stop();
-      timer = null;
+      setState(() {
+        timer!.cancel();
+        watch.stop();
+        timer = null;
+      });
     }
+  }
+
+  void _lapButtonPressed() {
+    Duration elapsed = watch.elapsed;
+    Duration duration = elapsed - totalInLaps;
+    totalInLaps = elapsed;
+
+    setState(() {
+      lapTimes.add(duration);
+    });
   }
 
   // MARK: Private functions
@@ -135,6 +159,6 @@ class _MyHomePageState extends State<MyHomePage> {
 
   String formatTime() {
     Duration duration = watch.elapsed;
-    return "${duration.inHours}:${duration.inMinutes.remainder(60)}:${(duration.inSeconds.remainder(60))}:${(duration.inMilliseconds.remainder(1000))}";
+    return "${duration.inHours}:${duration.inMinutes.remainder(60)}:${(duration.inSeconds.remainder(60))}:${(duration.inMilliseconds.remainder(1000)) ~/ 10}";
   }
 }
